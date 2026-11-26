@@ -142,19 +142,24 @@ final class XflMediaReader {
             throw new IOException("Sound cache missing: " + s(e, "name", ""));
         }
         int flags = soundFormat(s(e, "format", "")), length = i(e, "dataLength", 0);
+        long sampleCount = i(e, "sampleCount", 0);
+        int frameBytes = FlaSoundFormat.fromFlags(flags).getPcmFrameByteCount();
+        long pcmByteCount = sampleCount * frameBytes;
         if (length < 0 || length > bytes.length) {
-            throw new IOException("Invalid encoded sound dataLength");
+            throw new IOException("Invalid sound dataLength");
         }
-        if (length > 0) {
+        int encodedByteCount = 0;
+        if (length > 0 && (length != pcmByteCount || length != bytes.length)) {
             boolean mp3 = s(e, "href", "").toLowerCase(Locale.ROOT).endsWith(".mp3") || bytes.length > 2 && ((bytes[0] == 'I' && bytes[1] == 'D' && bytes[2] == '3') || ((bytes[0] & 255) == 255 && (bytes[1] & 224) == 224));
             if (!mp3) {
                 throw new IOException("Compressed sound cache codec cannot be determined: " + s(e, "name", ""));
             }
             flags |= 0x20;
+            encodedByteCount = length;
         }
         d.set("formatFlags", flags);
-        d.set("sampleCount", (long) i(e, "sampleCount", 0));
-        d.set("encodedByteCount", (long) length);
+        d.set("sampleCount", sampleCount);
+        d.set("encodedByteCount", (long) encodedByteCount);
         d.set("exportFormat", i(e, "exportFormat", 0));
         d.set("exportBits", i(e, "exportBits", 0));
         d.set("deviceSoundHRef", s(e, "deviceSoundHRef", ""));
@@ -163,13 +168,11 @@ final class XflMediaReader {
         d.set("importedMP3QualityFlag", b(e, "exportNative", false) ? 1 : 0);
         d.set("use8kSampleRateFlag", b(e, "use8kSampleRate", false) ? 1 : 0);
         if ((flags & 0xF0) == 0) {
-            int frameBytes = FlaSoundFormat.fromFlags(flags).getPcmFrameByteCount();
-            long expected = ((Number) d.get("sampleCount")).longValue() * frameBytes;
-            if (expected >= 0 && expected < bytes.length && bytes.length % frameBytes == 0) {
+            if (pcmByteCount >= 0 && pcmByteCount < bytes.length && bytes.length % frameBytes == 0) {
                 // Decoders can retain final codec padding beyond the declared duration.
                 s.issue(e, "Sound cache " + s(e, "soundDataHRef", "") + " contains "
-                        + (bytes.length - expected) + " extra PCM bytes beyond sampleCount; unused sample frames ignored.");
-                bytes = Arrays.copyOf(bytes, (int) expected);
+                        + (bytes.length - pcmByteCount) + " extra PCM bytes beyond sampleCount; unused sample frames ignored.");
+                bytes = Arrays.copyOf(bytes, (int) pcmByteCount);
             }
         }
         FlaRecord payload;

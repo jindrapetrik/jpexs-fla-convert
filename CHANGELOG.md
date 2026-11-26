@@ -20,6 +20,7 @@ All notable changes to this project will be documented in this file.
 - MX 2004 output uses its supported compiled-clip record revision, fixing "Unexpected file format" when converting newer SWC components.
 - XFL transformation points are converted from local to placed coordinates, preventing enlarged component bounds and distorted previews after binary conversion.
 - Reading zip files with wrong END header
+- Allow uncompressed sound cache (#2)
 
 ## [3.0.0] - 2026-10-24
 ### Added

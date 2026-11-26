@@ -234,6 +234,27 @@ public class XflReaderTest {
     }
 
     @Test
+    public void pcmCacheWithDataLengthIsWrittenAsUncompressedSound() throws Exception {
+        MemoryInput input = input("<media><DOMSoundItem name='Sound' href='sound.wav' soundDataHRef='sound.dat'"
+                + " format='44kHz 16bit Stereo' sampleCount='2' dataLength='8'/></media>" + timeline(""));
+        for (byte[] cache : new byte[][]{
+            {0, 0, 0, 0, 1, 2, 3, 4},
+            {(byte) 0xff, (byte) 0xfb, 0, 0, 1, 2, 3, 4}
+        }) {
+            input.files.put("bin/sound.dat", cache);
+            BinaryFlaDocument model = new XflReader().read(input);
+            BinaryFlaDocument output = read(new BinaryFlaConverter(FlaFormatVersion.F8).convert(model));
+            BinaryFlaDocument.Media media = output.getMedia().get(0);
+            assertEquals(media.getSoundFormat().getCodecId(), 0);
+            assertEquals(media.getSoundFormat().getChannelCount(), 2);
+            assertEquals(media.getSoundFormat().getBitsPerSample(), 16);
+            assertEquals(media.getDescriptor().get("sampleCount"), 2L);
+            assertEquals(media.getDescriptor().get("encodedByteCount"), 0L);
+            assertEquals(media.getStream().getData().toByteArray(), cache);
+        }
+    }
+
+    @Test
     public void pcmCachePaddingDoesNotExtendDeclaredSoundDuration() throws Exception {
         for (String format : Arrays.asList("11kHz 16bit Mono", "44kHz 16bit Stereo", "22kHz 8bit Mono")) {
             int frameBytes = FlaSoundFormat.fromFlags(XflMediaReader.soundFormat(format)).getPcmFrameByteCount();
